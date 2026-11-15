@@ -1,6 +1,7 @@
 import express from 'express'
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv'
+import cors from 'cors'
 
 
 //load enviroment variables
@@ -13,8 +14,12 @@ const app = express();
 const client = new MongoClient(process.env.BETTER_AUTH_DB_URL)
 const db = client.db("acme-store")
 
+//select products collection
+const productsCollection = db.collection("products")
+
 // Middleware: Read JSON data from client requests
 app.use(express.json())
+app.use(cors())
 
 // Route 1: Check whether the backend server is running
 app.get('/', (req, res) => {
@@ -22,25 +27,8 @@ app.get('/', (req, res) => {
 })
 
 // Route 2: Get all products from the database
-app.get("/products", (req, res) => {
-    const products = [
-        {
-            id: 1,
-            name: "Laptop",
-            price: 75000
-        },
-        {
-            id: 2,
-            name: "Mobile",
-            price: 25000
-        },
-        {
-            id: 3,
-            name: "Headphone",
-            price: 3000
-        }
-    ];
-
+app.get("/products", async(req, res) => {
+    const products = await productsCollection.find().toArray();
     res.json(products);
 });
 
@@ -50,12 +38,12 @@ app.get('/about', (req, res) => {
 })
 
 //Route 4: Create a new product
-app.post('/products', (req, res) =>{
+app.post('/products', async(req, res) =>{
     const newProduct = req.body;
-    // console.log(newProduct);
+    const result = await productsCollection.insertOne(newProduct);
     res.json({
         message: "product created successfully",
-        product: newProduct
+        productId: result.insertedId
     })
 })
 //connect to MongoDB
