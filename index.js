@@ -1,5 +1,5 @@
 import express from 'express'
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv'
 import cors from 'cors'
 
@@ -27,7 +27,7 @@ app.get('/', (req, res) => {
 })
 
 // Route 2: Get all products from the database
-app.get("/products", async(req, res) => {
+app.get("/products", async (req, res) => {
     const products = await productsCollection.find().toArray();
     res.json(products);
 });
@@ -38,7 +38,7 @@ app.get('/about', (req, res) => {
 })
 
 //Route 4: Create a new product
-app.post('/products', async(req, res) =>{
+app.post('/products', async (req, res) => {
     const newProduct = req.body;
     const result = await productsCollection.insertOne(newProduct);
     res.json({
@@ -46,6 +46,24 @@ app.post('/products', async(req, res) =>{
         productId: result.insertedId
     })
 })
+
+//Route 5: Delete a product
+app.delete('products/:id', async (req, res) => {
+    const productId = req.params.id;
+
+    const result = await productsCollection.deleteOne({
+        _id: new ObjectId(productId)
+    });
+    if (result.deletedCount === 0) {
+        return res.status(404).json({
+            message: "Product not found"
+        });
+    }
+    res.json({
+        message: "Product deleted successfully"
+    });
+});
+
 //connect to MongoDB
 await client.connect();
 console.log("MongoDB connected successfully!");
