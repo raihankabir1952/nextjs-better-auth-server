@@ -20,12 +20,13 @@ const db = client.db("acme-store")
 
 //select products collection
 const productsCollection = db.collection("products")
+const ordersCollection = db.collection("orders")
 
 // Middleware: Read JSON data from client requests
 app.use(cors())
 
 // Stripe Webhook Route
-app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+app.post('/webhook', express.raw({ type: 'application/json' }), async(req, res) => {
 
     const sig = req.headers['stripe-signature'];
 
@@ -47,7 +48,36 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
     console.log("Webhook Event Received:", event.type);
 
     if (event.type === 'checkout.session.completed') {
+
+        const session = event.data.object;
+
         console.log("Checkout Session Completed!");
+
+        if (session.payment_status === 'paid') {
+
+            const existingOrder = await ordersCollection.findOne({
+                stripeSessionId: session.id
+            });
+
+            if (!existingOrder) {
+
+                const newOrder = {
+                    productId: new ObjectId(session.metadata.productId),
+                    productName: session.metadata.productName,
+                    customerEmail: session.customer_details?.email,
+                    amount: session.amount_total,
+                    currency: session.currency,
+                    paymentStatus: session.payment_status,
+                    stripeSessionId: session.id,
+                    paymentIntentId: session.payment_intent,
+                    createdAt: new Date()
+                };
+
+                await ordersCollection.insertOne(newOrder);
+
+                console.log("Order Saved Successfully!");
+            }
+        }
     }
 
     res.json({ received: true });
@@ -168,6 +198,10 @@ app.post('/create-checkout-session', async (req, res) => {
                 quantity: 1
             }
         ],
+        metadata: {
+            productId: product._id.toString(),
+            productName: product.name
+        },
 
         success_url: 'http://localhost:3000/payment/success?session_id={CHECKOUT_SESSION_ID}',
         cancel_url: 'http://localhost:3000/payment/cancel'
