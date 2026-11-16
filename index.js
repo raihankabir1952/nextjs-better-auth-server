@@ -48,7 +48,7 @@ app.post('/products', async (req, res) => {
 })
 
 //Route 5: Delete a product
-app.delete('products/:id', async (req, res) => {
+app.delete('/products/:id', async (req, res) => {
     const productId = req.params.id;
 
     const result = await productsCollection.deleteOne({
@@ -61,6 +61,27 @@ app.delete('products/:id', async (req, res) => {
     }
     res.json({
         message: "Product deleted successfully"
+    });
+});
+
+//Route 6: Update an existing product
+app.put('/products/:id', async (req, res) => {
+    const productId = req.params.id;
+    const updatedProduct = req.body;
+
+    const result = await productsCollection.updateOne({
+        _id: new ObjectId(productId),
+    }, {
+        $set: updatedProduct
+    }
+    );
+    if(result.matchedCount === 0){
+        return res.status(404).json({
+            message: "Product not found"
+        })
+    }
+    res.json({
+        message: "Product updated successfully"
     });
 });
 
