@@ -2,10 +2,14 @@ import express from 'express'
 import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv'
 import cors from 'cors'
+import Stripe from 'stripe';
 
 
 //load enviroment variables
 dotenv.config();
+
+//stripe 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 //create express app
 const app = express();
@@ -75,7 +79,7 @@ app.put('/products/:id', async (req, res) => {
         $set: updatedProduct
     }
     );
-    if(result.matchedCount === 0){
+    if (result.matchedCount === 0) {
         return res.status(404).json({
             message: "Product not found"
         })
@@ -86,18 +90,63 @@ app.put('/products/:id', async (req, res) => {
 });
 
 //Route 7: Get a single product by ID
-app.get('/products/:id', async (req,res) =>{
+app.get('/products/:id', async (req, res) => {
     const productId = req.params.id;
-    
+
     const product = await productsCollection.findOne({
         _id: new ObjectId(productId)
     });
-    if(!product){
+    if (!product) {
         return res.status(404).json({
             message: "Product not found"
         })
     }
     res.json(product)
+});
+
+//Route: Create Stripe Checkout Session
+app.post('/create-checkout-session', async (req, res) => {
+    const { productId } = req.body;
+
+    // Find product from MongoDB
+    const product = await productsCollection.findOne({
+        _id: new ObjectId(productId)
+    });
+
+    if (!product) {
+        return res.status(404).json({
+            message: "Product not found"
+        });
+    }
+
+    console.log("Creating Stripe Checkout Session...");
+
+    // Create Stripe Checkout Session
+    const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+
+        line_items: [
+            {
+                price_data: {
+                    currency: 'usd',
+                    product_data: {
+                        name: product.name
+                    },
+                    unit_amount: Number(product.price)
+                },
+                quantity: 1
+            }
+        ],
+
+        success_url: 'http://localhost:3000/payment/success?session_id={CHECKOUT_SESSION_ID}',
+        cancel_url: 'http://localhost:3000/payment/cancel'
+    });
+
+    console.log("Checkout Session Created:", session.id);
+
+    res.json({
+        url: session.url
+    });
 });
 
 
