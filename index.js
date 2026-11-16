@@ -85,6 +85,22 @@ app.put('/products/:id', async (req, res) => {
     });
 });
 
+//Route 7: Get a single product by ID
+app.get('/products/:id', async (req,res) =>{
+    const productId = req.params.id;
+    
+    const product = await productsCollection.findOne({
+        _id: new ObjectId(productId)
+    });
+    if(!product){
+        return res.status(404).json({
+            message: "Product not found"
+        })
+    }
+    res.json(product)
+});
+
+
 //connect to MongoDB
 await client.connect();
 console.log("MongoDB connected successfully!");
