@@ -22,8 +22,39 @@ const db = client.db("acme-store")
 const productsCollection = db.collection("products")
 
 // Middleware: Read JSON data from client requests
-app.use(express.json())
 app.use(cors())
+
+// Stripe Webhook Route
+app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+
+    const sig = req.headers['stripe-signature'];
+
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(
+            req.body,
+            sig,
+            process.env.STRIPE_WEBHOOK_SECRET
+        );
+
+    } catch (err) {
+        console.log("Webhook Signature Verification Failed:", err.message);
+
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    console.log("Webhook Event Received:", event.type);
+
+    if (event.type === 'checkout.session.completed') {
+        console.log("Checkout Session Completed!");
+    }
+
+    res.json({ received: true });
+});
+
+// Read JSON data from normal client requests
+app.use(express.json())
 
 // Route 1: Check whether the backend server is running
 app.get('/', (req, res) => {
