@@ -97,6 +97,12 @@ app.get("/products", async (req, res) => {
     res.json(products);
 });
 
+//Route: Get all orders
+app.get('/orders', async (req, res) =>{
+    const orders = await ordersCollection.find().toArray();
+    res.json(orders)
+})
+
 // Route 3: Show API information
 app.get('/about', (req, res) => {
     res.send("Welcome to ACME Store API")
