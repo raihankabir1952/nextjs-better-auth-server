@@ -1,32 +1,33 @@
-import express from 'express'
-import { MongoClient, ObjectId } from 'mongodb';
-import dotenv from 'dotenv'
-import cors from 'cors'
-import Stripe from 'stripe';
-import { fromNodeHeaders } from "better-auth/node";
-import { auth } from "./auth.js";
 
+import dotenv from 'dotenv';
 
-//load enviroment variables
+// Load environment variables
 dotenv.config();
 
-//stripe 
+import express from 'express';
+import { MongoClient, ObjectId } from 'mongodb';
+import cors from 'cors';
+import Stripe from 'stripe';
+import { fromNodeHeaders } from 'better-auth/node';
+import { auth } from './auth.js';
+
+// Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-//create express app
+// Create Express app
 const app = express();
 
-//MongoDB connection
-const client = new MongoClient(process.env.BETTER_AUTH_DB_URL)
-const db = client.db("acme-store")
+// MongoDB connection
+const client = new MongoClient(process.env.BETTER_AUTH_DB_URL);
+const db = client.db('acme-store');
 
-//select products collection
-const productsCollection = db.collection("products")
-const ordersCollection = db.collection("orders")
+// Select collections
+const productsCollection = db.collection('products');
+const ordersCollection = db.collection('orders');
 
-// Middleware: Read JSON data from client requests
+// CORS Middleware
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: 'http://localhost:3000',
     credentials: true
 }));
 
@@ -45,18 +46,17 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
         );
 
     } catch (err) {
-        console.log("Webhook Signature Verification Failed:", err.message);
-
+        console.log('Webhook Signature Verification Failed:', err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    console.log("Webhook Event Received:", event.type);
+    console.log('Webhook Event Received:', event.type);
 
     if (event.type === 'checkout.session.completed') {
 
         const session = event.data.object;
 
-        console.log("Checkout Session Completed!");
+        console.log('Checkout Session Completed!');
 
         if (session.payment_status === 'paid') {
 
@@ -80,7 +80,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 
                 await ordersCollection.insertOne(newOrder);
 
-                console.log("Order Saved Successfully!");
+                console.log('Order Saved Successfully!');
             }
         }
     }
@@ -89,129 +89,157 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 });
 
 // Read JSON data from normal client requests
-app.use(express.json())
+app.use(express.json());
 
-//session verification api
-app.get('/api/me', async (req, res) =>{
-    const session = await auth.api.getSession({
-        headers: fromNodeHeaders(req.header),
-    });
+// Session Verification API
+// Session Verification API
+app.get("/api/me", async (req, res) => {
+    console.log("Cookie received:", Boolean(req.headers.cookie));
 
-    if(!session){
-        return res.status(401).json({
-            message: "Unauthorized",
-        })
+    console.log(
+        "Cookie names:",
+        req.headers.cookie
+            ?.split(";")
+            .map(cookie => cookie.trim().split("=")[0])
+    );
+
+    try {
+        const session = await auth.api.getSession({
+            headers: fromNodeHeaders(req.headers),
+        });
+
+        if (!session) {
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
+        }
+
+        return res.status(200).json({
+            message: "Session verified successfully",
+            user: session.user,
+        });
+
+    } catch (error) {
+        console.error("Session verification error:", error);
+
+        return res.status(500).json({
+            message: "Internal Server Error",
+        });
     }
-
-    res.json({
-        message: "Session verified successfully",
-        user: session.user
-    });
 });
 
-// Route 1: Check whether the backend server is running
+// Check Backend Server
 app.get('/', (req, res) => {
-    res.send("ACME Store Backend is running!")
-})
+    res.send('ACME Store Backend is running!');
+});
 
-// Route 2: Get all products from the database
-app.get("/products", async (req, res) => {
+// Get All Products
+app.get('/products', async (req, res) => {
     const products = await productsCollection.find().toArray();
     res.json(products);
 });
 
-//Route: Get all orders
+// Get All Orders
 app.get('/orders', async (req, res) => {
     const orders = await ordersCollection.find().toArray();
-    res.json(orders)
-})
+    res.json(orders);
+});
 
-// Route 3: Show API information
+// API Information
 app.get('/about', (req, res) => {
-    res.send("Welcome to ACME Store API")
-})
+    res.send('Welcome to ACME Store API');
+});
 
-//Route 4: Create a new product
+// Create Product
 app.post('/products', async (req, res) => {
     const newProduct = req.body;
-    const result = await productsCollection.insertOne(newProduct);
-    res.json({
-        message: "product created successfully",
-        productId: result.insertedId
-    })
-})
 
-//Route 5: Delete a product
+    const result = await productsCollection.insertOne(newProduct);
+
+    res.json({
+        message: 'product created successfully',
+        productId: result.insertedId
+    });
+});
+
+// Delete Product
 app.delete('/products/:id', async (req, res) => {
     const productId = req.params.id;
 
     const result = await productsCollection.deleteOne({
         _id: new ObjectId(productId)
     });
+
     if (result.deletedCount === 0) {
         return res.status(404).json({
-            message: "Product not found"
+            message: 'Product not found'
         });
     }
+
     res.json({
-        message: "Product deleted successfully"
+        message: 'Product deleted successfully'
     });
 });
 
-//Route 6: Update an existing product
+// Update Product
 app.put('/products/:id', async (req, res) => {
     const productId = req.params.id;
     const updatedProduct = req.body;
 
-    const result = await productsCollection.updateOne({
-        _id: new ObjectId(productId),
-    }, {
-        $set: updatedProduct
-    }
+    const result = await productsCollection.updateOne(
+        {
+            _id: new ObjectId(productId)
+        },
+        {
+            $set: updatedProduct
+        }
     );
+
     if (result.matchedCount === 0) {
         return res.status(404).json({
-            message: "Product not found"
-        })
+            message: 'Product not found'
+        });
     }
+
     res.json({
-        message: "Product updated successfully"
+        message: 'Product updated successfully'
     });
 });
 
-//Route 7: Get a single product by ID
+// Get Single Product
 app.get('/products/:id', async (req, res) => {
     const productId = req.params.id;
 
     const product = await productsCollection.findOne({
         _id: new ObjectId(productId)
     });
+
     if (!product) {
         return res.status(404).json({
-            message: "Product not found"
-        })
+            message: 'Product not found'
+        });
     }
-    res.json(product)
+
+    res.json(product);
 });
 
-//Route: Create Stripe Checkout Session
+// Create Stripe Checkout Session
 app.post('/create-checkout-session', async (req, res) => {
+
     const { productId } = req.body;
 
-    // Find product from MongoDB
     const product = await productsCollection.findOne({
         _id: new ObjectId(productId)
     });
 
     if (!product) {
         return res.status(404).json({
-            message: "Product not found"
+            message: 'Product not found'
         });
     }
 
-    console.log("Creating Stripe Checkout Session...");
+    console.log('Creating Stripe Checkout Session...');
 
-    // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
         mode: 'payment',
 
@@ -227,6 +255,7 @@ app.post('/create-checkout-session', async (req, res) => {
                 quantity: 1
             }
         ],
+
         metadata: {
             productId: product._id.toString(),
             productName: product.name
@@ -236,19 +265,19 @@ app.post('/create-checkout-session', async (req, res) => {
         cancel_url: 'http://localhost:3000/payment/cancel'
     });
 
-    console.log("Checkout Session Created:", session.id);
+    console.log('Checkout Session Created:', session.id);
 
     res.json({
         url: session.url
     });
 });
 
-
-//connect to MongoDB
+// Connect to MongoDB
 await client.connect();
-console.log("MongoDB connected successfully!");
 
-// Start the server on port 5000
+console.log('MongoDB connected successfully!');
+
+// Start Server
 app.listen(5000, () => {
-    console.log("Server is running on port 5000");
-})
+    console.log('Server is running on port 5000');
+});
