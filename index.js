@@ -3,6 +3,8 @@ import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv'
 import cors from 'cors'
 import Stripe from 'stripe';
+import { fromNodeHeaders } from "better-auth/node";
+import { auth } from "./auth.js";
 
 
 //load enviroment variables
@@ -26,7 +28,7 @@ const ordersCollection = db.collection("orders")
 app.use(cors())
 
 // Stripe Webhook Route
-app.post('/webhook', express.raw({ type: 'application/json' }), async(req, res) => {
+app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
 
     const sig = req.headers['stripe-signature'];
 
@@ -86,6 +88,24 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async(req, res) 
 // Read JSON data from normal client requests
 app.use(express.json())
 
+//session verification api
+app.get('/api/me', async (req, res) =>{
+    const session = await auth.api.getSession({
+        headers: fromNodeHeaders(req.header),
+    });
+
+    if(!session){
+        return res.status(401).json({
+            message: "Unauthorized",
+        })
+    }
+
+    res.json({
+        message: "Session verified successfully",
+        user: session.user
+    });
+});
+
 // Route 1: Check whether the backend server is running
 app.get('/', (req, res) => {
     res.send("ACME Store Backend is running!")
@@ -98,7 +118,7 @@ app.get("/products", async (req, res) => {
 });
 
 //Route: Get all orders
-app.get('/orders', async (req, res) =>{
+app.get('/orders', async (req, res) => {
     const orders = await ordersCollection.find().toArray();
     res.json(orders)
 })
