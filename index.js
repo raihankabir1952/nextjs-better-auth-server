@@ -10,6 +10,7 @@ import cors from 'cors';
 import Stripe from 'stripe';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from './auth.js';
+import verifyToken from "./middlewares/verifyToken.js";
 
 // Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -92,7 +93,6 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
 app.use(express.json());
 
 // Session Verification API
-// Session Verification API
 app.get("/api/me", async (req, res) => {
     console.log("Cookie received:", Boolean(req.headers.cookie));
 
@@ -126,6 +126,14 @@ app.get("/api/me", async (req, res) => {
             message: "Internal Server Error",
         });
     }
+});
+
+// Protected Test Route
+app.get("/api/protected", verifyToken, (req, res) => {
+    res.status(200).json({
+        message: "You are authenticated!",
+        user: req.user,
+    });
 });
 
 // Check Backend Server
