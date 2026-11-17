@@ -25,7 +25,10 @@ const productsCollection = db.collection("products")
 const ordersCollection = db.collection("orders")
 
 // Middleware: Read JSON data from client requests
-app.use(cors())
+app.use(cors({
+    origin: "http://localhost:3000",
+    credentials: true
+}));
 
 // Stripe Webhook Route
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
